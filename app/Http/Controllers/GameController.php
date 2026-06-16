@@ -1,3 +1,4 @@
+```php
 <?php
 
 namespace App\Http\Controllers;
@@ -5,7 +6,7 @@ namespace App\Http\Controllers;
 use App\Models\Game;
 use App\Models\Genre;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\File;
 
 class GameController extends Controller
 {
@@ -49,7 +50,7 @@ class GameController extends Controller
         ]);
 
         if ($request->hasFile('image')) {
-            $data['image'] = $request->file('image')->store('games', 'public');
+            $data['image'] = $this->saveGameImage($request);
         }
 
         $data['user_id'] = auth()->id();
@@ -107,11 +108,9 @@ class GameController extends Controller
         ]);
 
         if ($request->hasFile('image')) {
-            if ($game->image) {
-                Storage::disk('public')->delete($game->image);
-            }
+            $this->deleteGameImage($game->image);
 
-            $data['image'] = $request->file('image')->store('games', 'public');
+            $data['image'] = $this->saveGameImage($request);
         }
 
         $game->update($data);
@@ -129,9 +128,7 @@ class GameController extends Controller
                 ->with('error', 'Tev nav atļauts dzēst šo spēli.');
         }
 
-        if ($game->image) {
-            Storage::disk('public')->delete($game->image);
-        }
+        $this->deleteGameImage($game->image);
 
         $game->delete();
 
@@ -139,4 +136,35 @@ class GameController extends Controller
             ->route('games.index')
             ->with('success', 'Spēle dzēsta!');
     }
+
+    private function saveGameImage(Request $request): string
+    {
+        $file = $request->file('image');
+
+        $directory = public_path('storage/games');
+
+        if (!File::exists($directory)) {
+            File::makeDirectory($directory, 0755, true);
+        }
+
+        $filename = uniqid('game_', true) . '.' . $file->getClientOriginalExtension();
+
+        $file->move($directory, $filename);
+
+        return 'games/' . $filename;
+    }
+
+    private function deleteGameImage(?string $image): void
+    {
+        if (!$image) {
+            return;
+        }
+
+        $path = public_path('storage/' . $image);
+
+        if (File::exists($path)) {
+            File::delete($path);
+        }
+    }
 }
+```
